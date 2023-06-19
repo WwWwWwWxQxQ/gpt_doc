@@ -3,3 +3,4 @@ flask_sqlalchemy
 pymysql
 flask_cors
 python-dotenv
+qdrant-client
