@@ -5,13 +5,19 @@ from flask_sqlalchemy import SQLAlchemy
 import pymysql
 
 import qdrant
+from dotenv import load_dotenv
+import os
+
+# 加载 .env 文件中的配置信息
+load_dotenv()
 
 pymysql.install_as_MySQLdb()
 
 app = Flask(__name__)
 CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:12345678@localhost:3306/chat_with_your_docs'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('',
+                                                  default='mysql://root:12345678@localhost:3306/chat_with_your_docs')
 app.config['SQLALCHEMY_ECHO'] = True
 db = SQLAlchemy(app)
 
@@ -143,6 +149,18 @@ def add_doc():
     return response
 
 
+@app.route('/delete/doc/<int:doc_id>', methods=['POST'])
+def delete_doc(doc_id):
+    doc = db.get_or_404(Docs, doc_id)
+    Docs.delete(doc)
+    chunks = DocsChunks.query.filter_by(docs_id=doc_id).all()
+    for chunk in chunks:
+        print("delete doc chunk", chunk.id)
+        DocsChunks.delete(chunk)
+        qdrant.delete_vector(vector_id=chunk.vector_id)
+    return 'ok'
+
+
 @app.route('/add/chunk', methods=['POST'])
 def add_chunk():
     docs_id = request.json.get('docs_id')
@@ -173,7 +191,6 @@ def add_chunk():
 
 @app.route('/getAll')
 def get_all():
-    print(1)
     # doc = Docs.query.all()
     # print(doc)
     # doc = list(map(lambda x: x.to_json(), doc))
