@@ -1,14 +1,20 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
 from flask_sqlalchemy import SQLAlchemy
 import pymysql
+
+import qdrant
 
 pymysql.install_as_MySQLdb()
 
 app = Flask(__name__)
+CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:11111111@localhost:3306/gpt_doc'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:12345678@localhost:3306/chat_with_your_docs'
 app.config['SQLALCHEMY_ECHO'] = True
 db = SQLAlchemy(app)
+
 
 class DocsChunks(db.Model):
     __tablename__ = 'docs_chunks'
@@ -26,7 +32,8 @@ class DocsChunks(db.Model):
     created_by = db.Column(db.String(80))
     updated_by = db.Column(db.String(80))
 
-    def __init__(self, docs_id, vector_id, page_content, page_number, lines_from, lines_to, remark, active, created_time, updated_time, created_by, updated_by):
+    def __init__(self, docs_id, vector_id, page_content, page_number, lines_from, lines_to, remark, active,
+                 created_time, updated_time, created_by, updated_by):
         self.docs_id = docs_id
         self.vector_id = vector_id
         self.page_content = page_content
@@ -59,6 +66,11 @@ class DocsChunks(db.Model):
             'created_by': self.created_by,
             'updated_by': self.updated_by
         }
+
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
 
 class Docs(db.Model):
     __tablename__ = 'docs'
@@ -102,6 +114,10 @@ class Docs(db.Model):
     def __repr__(self):
         return '<Docs %r>' % self.docs_name
 
+    def delete(self):
+        db.session.delete(self)
+        db.session.commit()
+
 
 @app.route('/add/doc', methods=['POST'])
 def add_doc():
@@ -119,7 +135,13 @@ def add_doc():
     db.session.add(temp)
     db.session.commit()
 
-    return 'success'
+    data = {
+        "id": temp.id
+    }
+    response = jsonify(data)
+
+    return response
+
 
 @app.route('/add/chunk', methods=['POST'])
 def add_chunk():
@@ -136,30 +158,74 @@ def add_chunk():
     created_by = request.json.get('created_by')
     updated_by = request.json.get('updated_by')
 
-    temp = DocsChunks(docs_id, vector_id, page_content, page_number, lines_from, lines_to, remark, active, created_time, updated_time, created_by, updated_by)
+    temp = DocsChunks(docs_id, vector_id, page_content, page_number, lines_from, lines_to, remark, active, created_time,
+                      updated_time, created_by, updated_by)
     db.session.add(temp)
     db.session.commit()
 
-    return 'success'
+    data = {
+        "id": temp.id
+    }
+    response = jsonify(data)
+
+    return response
 
 
 @app.route('/getAll')
 def get_all():
-    doc = Docs.query.all()
+    print(1)
+    # doc = Docs.query.all()
+    # print(doc)
+    # doc = list(map(lambda x: x.to_json(), doc))
+
+    current = request.args.get('current', 1, type=int)
+    pageSize = request.args.get('pageSize', 10, type=int)
+    doc = Docs.query.paginate(page=current, per_page=pageSize)
     doc = list(map(lambda x: x.to_json(), doc))
 
-    return doc
+    response = {
+        "data": doc,
+        "pageInfo": {
+            "current": current,
+            "pageSize": pageSize
+        }
+    }
 
-@app.route('/getAll/chunk')
-def get_all_chunk():
-    doc = DocsChunks.query.all()
+    return response
+
+
+@app.route('/getAll/chunk/<int:docs_id>')
+def get_all_chunk(docs_id):
+    # doc = DocsChunks.query.all()
+    # doc = list(map(lambda x: x.to_json(), doc))
+
+    current = request.args.get('current', 1, type=int)
+    pageSize = request.args.get('pageSize', 10, type=int)
+    doc = db.paginate(db.select(DocsChunks).filter_by(docs_id=docs_id), page=current, per_page=pageSize)
     doc = list(map(lambda x: x.to_json(), doc))
 
-    return doc
+    response = {
+        "data": doc,
+        "pageInfo": {
+            "current": current,
+            "pageSize": pageSize
+        }
+    }
+    return response
+
+
+@app.route('/delete/chunk/<int:id>', methods=['POST'])
+def delete_chunk(id):
+    chunk = db.session.execute(db.select(DocsChunks).filter_by(id=id)).scalar_one()
+    DocsChunks.delete(chunk)
+    qdrant.delete_vector(chunk.vector_id)
+    return 'ok'
+
 
 @app.route('/add/chunk/one')
 def add_chunk_one():
-    newChunk = DocsChunks(1, "1", 'page_content', 1, 1, 1, 'remark', True, "2023-01-01", "2023-01-01", 'created_by', 'updated_by')
+    newChunk = DocsChunks(1, "1", 'page_content', 1, 1, 1, 'remark', True, "2023-01-01", "2023-01-01", 'created_by',
+                          'updated_by')
     db.session.add(newChunk)
     db.session.commit()
 
@@ -172,4 +238,4 @@ def hello_world():  # put application's code here
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=5001, debug=True)
