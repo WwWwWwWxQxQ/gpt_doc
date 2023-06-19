@@ -13,6 +13,10 @@ CORS(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:12345678@localhost:3306/chat_with_your_docs'
 app.config['SQLALCHEMY_ECHO'] = True
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 20,
+    'pool_recycle': 120,
+}
 db = SQLAlchemy(app)
 
 
