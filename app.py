@@ -16,7 +16,7 @@ pymysql.install_as_MySQLdb()
 app = Flask(__name__)
 CORS(app)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('',
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL',
                                                   default='mysql://root:12345678@localhost:3306/chat_with_your_docs')
 app.config['SQLALCHEMY_ECHO'] = True
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
