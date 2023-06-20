@@ -180,6 +180,11 @@ def add_chunk():
     created_by = request.json.get('created_by')
     updated_by = request.json.get('updated_by')
 
+    source = request.json.get('source')
+
+    doc = Docs.query.filter_by(docs_path=source).first()
+    docs_id = doc.id
+
     temp = DocsChunks(docs_id, vector_id, page_content, page_number, lines_from, lines_to, remark, active, created_time,
                       updated_time, created_by, updated_by)
     db.session.add(temp)
@@ -264,4 +269,4 @@ def hello_world():  # put application's code here
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5011, debug=True)
