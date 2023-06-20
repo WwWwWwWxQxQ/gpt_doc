@@ -202,13 +202,15 @@ def get_all():
     current = request.args.get('current', 1, type=int)
     pageSize = request.args.get('pageSize', 10, type=int)
     doc = Docs.query.paginate(page=current, per_page=pageSize)
+    total = Docs.query.count()
     doc = list(map(lambda x: x.to_json(), doc))
 
     response = {
         "data": doc,
         "pageInfo": {
             "current": current,
-            "pageSize": pageSize
+            "pageSize": pageSize,
+            "total": total
         }
     }
 
@@ -223,13 +225,16 @@ def get_all_chunk(docs_id):
     current = request.args.get('current', 1, type=int)
     pageSize = request.args.get('pageSize', 10, type=int)
     doc = db.paginate(db.select(DocsChunks).filter_by(docs_id=docs_id), page=current, per_page=pageSize)
+    # total = db.session.execute(db.select(DocsChunks).filter_by(docs_id=docs_id)).count()
+    total = DocsChunks.query.filter_by(docs_id=docs_id).count()
     doc = list(map(lambda x: x.to_json(), doc))
 
     response = {
         "data": doc,
         "pageInfo": {
             "current": current,
-            "pageSize": pageSize
+            "pageSize": pageSize,
+            "total": total
         }
     }
     return response
